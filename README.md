@@ -9,7 +9,7 @@
 
 ## Repository Structure
 
-### 📊 [Python Momentum Strategy](./python-momentum-strategy/)
+### 📊 [Python Buffer Strategy](./python-buffer-strategy/)
 Buffer-based momentum strategy with quarterly rebalancing and optimized turnover control.
 
 **Key Features:**
@@ -18,7 +18,7 @@ Buffer-based momentum strategy with quarterly rebalancing and optimized turnover
 - PostgreSQL integration for production deployment
 - Comprehensive transaction cost modeling
 
-### 📈 [R Momentum Strategy](./r-momentum-strategy/)
+### 📈 [R Momentum Risk Adjusted Strategy](./r-risk-adjusted/)
 Monthly rebalancing momentum strategy with comprehensive risk analytics.
 
 **Key Features:**
