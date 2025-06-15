@@ -27,7 +27,10 @@ Monthly rebalancing momentum strategy with comprehensive risk analytics.
 - Advanced performance metrics (Sortino, Calmar, Alpha/Beta)
 - Interactive visualization with dygraphs
 
-### 📋 [Performance Analysis](./performance-analysis/)
+### 📋 [Python Performance Analysis](./python-buffer-performance/)
+Comparative analysis and visualization of strategy performance vs benchmarks.
+
+### 📋 [R Performance Analysis](./R-risk-adjusted-performance/)
 Comparative analysis and visualization of strategy performance vs benchmarks.
 
 ## Strategy Methodology
