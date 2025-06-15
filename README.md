@@ -137,6 +137,6 @@ This work builds on established academic research in momentum investing:
 - **Market conditions** can change, affecting momentum efficacy
 
 ## Contact & Collaboration
-Interested in discussing systematic momentum strategies or quantitative finance applications? Feel free to reach out!
+Interested in discussing systematic momentum strategies or quantitative finance applications? Feel free to reach out! Email is in my portfolio bio!
 
 **Challenge:** Can you optimize the parameters further and beat these returns? Fork the repo and let's see! 🎯
