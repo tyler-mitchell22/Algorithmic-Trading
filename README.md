@@ -28,7 +28,7 @@ Monthly rebalancing momentum strategy with comprehensive risk analytics.
 - Interactive visualization with dygraphs
 
 ### 📋 [Python Performance Analysis](./python-buffer-performance/)
-Comparative analysis and visualization of strategy performance vs benchmarks.
+Analysis and visualization of strategy performance.
 
 ### 📋 [R Performance Analysis](./R-risk-adjusted-performance/)
 Comparative analysis and visualization of strategy performance vs benchmarks.
