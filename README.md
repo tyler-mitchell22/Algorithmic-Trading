@@ -49,7 +49,7 @@ Both implementations use **risk-adjusted momentum** as the primary factor:
 | Buffer System | 40% improvement threshold | None |
 | Database | PostgreSQL | SQLite |
 | Weighting | Rank-based with buffer logic | Equal-weighted top 10 |
-| Transaction Costs | 0.1% per trade | Modeled |
+| Transaction Costs | 0.1% per trade | Not Modeled |
 
 ## Investment Universe
 - **S&P 500 constituents** with complete data from 2010+
