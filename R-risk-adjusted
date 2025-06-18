@@ -11,6 +11,7 @@ db_conn <- dbConnect(RSQLite::SQLite(), db_path)
 dbExecute(db_conn, "DROP TABLE IF EXISTS etf_holdings")
 dbExecute(db_conn, "DROP TABLE IF EXISTS etf_performance")
 dbExecute(db_conn, "DROP TABLE IF EXISTS performance_metrics")
+dbExecute(db_conn, "DROP TABLE IF EXISTS regime_data")
 
 # Create necessary tables for tracking ETF data
 dbExecute(db_conn, "CREATE TABLE IF NOT EXISTS etf_holdings (
@@ -21,7 +22,9 @@ dbExecute(db_conn, "CREATE TABLE IF NOT EXISTS etf_holdings (
   monthly_return REAL,
   return_12m REAL,
   return_1m REAL,
-  volatility_12m REAL
+  volatility_12m REAL,
+  regime_score REAL,
+  position_count INTEGER
 )")
 
 dbExecute(db_conn, "CREATE TABLE IF NOT EXISTS etf_performance (
@@ -51,6 +54,15 @@ dbExecute(db_conn, "CREATE TABLE IF NOT EXISTS performance_metrics (
   beta_inc REAL,
   alpha_3y REAL,
   alpha_inc REAL
+)")
+
+dbExecute(db_conn, "CREATE TABLE IF NOT EXISTS regime_data (
+  regime_date TEXT PRIMARY KEY,
+  vix_level REAL,
+  spy_trend_score REAL,
+  market_breadth REAL,
+  regime_score REAL,
+  regime_label TEXT
 )")
 
 nyse <- tq_exchange("NYSE") |> clean_names()
@@ -93,20 +105,120 @@ rebalance_dates <- price_data |> filter(!is.na(momentum)) |>
   unique() |> 
   sort()
 
+# Collect S&P 500 Data (moved up for regime calculation)
+spy <- BatchGetSymbols(
+  tickers = "SPY",
+  freq.data = "monthly",
+  first.date = as.Date("2013-01-01"), thresh.bad.data = 0.5,
+  last.date = as.Date("2023-12-31"), 
+  cache.folder = file.path(tempdir(), "BGS_Cache"))
+
+spy_price_data <- spy$df.tickers |> clean_names()
+
+# Collect VIX Data for regime detection
+vix <- BatchGetSymbols(
+  tickers = "^VIX",
+  freq.data = "monthly",
+  first.date = as.Date("2013-01-01"), thresh.bad.data = 0.5,
+  last.date = as.Date("2023-12-31"), 
+  cache.folder = file.path(tempdir(), "BGS_Cache"))
+
+vix_data <- vix$df.tickers |> clean_names()
+
+# REGIME DETECTION LOGIC
+spy_regime_data <- spy_price_data |> 
+  arrange(ref_date) |>
+  mutate(
+    # Moving averages for trend detection
+    ma_50 = rollmean(price_adjusted, k = 3, fill = NA, align = "right"), # 3-month MA (approx 50-day)
+    ma_200 = rollmean(price_adjusted, k = 8, fill = NA, align = "right"), # 8-month MA (approx 200-day)
+    
+    # Trend scores
+    price_vs_ma50 = ifelse(price_adjusted > ma_50, 1, 0),
+    price_vs_ma200 = ifelse(price_adjusted > ma_200, 1, 0),
+    ma50_vs_ma200 = ifelse(ma_50 > ma_200, 1, 0),
+    
+    # Market breadth approximation (SPY momentum vs its own volatility)
+    spy_monthly_return = price_adjusted / lag(price_adjusted) - 1,
+    spy_momentum_3m = rollmean(spy_monthly_return, k = 3, fill = NA, align = "right"),
+    spy_vol_3m = rollapply(spy_monthly_return, width = 3, FUN = sd, align = "right", fill = NA),
+    market_breadth = ifelse(is.na(spy_vol_3m) | spy_vol_3m == 0, 0, 
+                            pmax(0, pmin(1, (spy_momentum_3m / spy_vol_3m + 1) / 2)))
+  )
+
+# Combine regime indicators
+regime_indicators <- spy_regime_data |>
+  select(ref_date, price_vs_ma50, price_vs_ma200, ma50_vs_ma200, market_breadth) |>
+  left_join(
+    vix_data |> select(ref_date, ticker, price_adjusted) |> 
+      rename(vix_level = price_adjusted) |>
+      filter(ticker == "^VIX") |>
+      select(-ticker),
+    by = "ref_date"
+  ) |>
+  filter(ref_date %in% rebalance_dates) |>
+  mutate(
+    # VIX score (inverted - lower VIX = better for momentum, but not too low)
+    vix_score = case_when(
+      vix_level < 15 ~ 0.3,  # Too low volatility, poor for momentum
+      vix_level >= 15 & vix_level < 25 ~ 0.8,  # Good volatility for momentum
+      vix_level >= 25 & vix_level < 35 ~ 1.0,  # High volatility, great for momentum
+      vix_level >= 35 ~ 0.4,  # Too high, fear dominates
+      TRUE ~ 0.5
+    ),
+    
+    # Trend score (combination of price vs MAs)
+    spy_trend_score = (price_vs_ma50 + price_vs_ma200 + ma50_vs_ma200) / 3,
+    
+    # Overall regime score (0 to 1, higher = more momentum-friendly)
+    regime_score = (0.4 * spy_trend_score + 0.3 * vix_score + 0.3 * market_breadth),
+    
+    # Regime labels
+    regime_label = case_when(
+      regime_score >= 0.7 ~ "MOMENTUM_STRONG",
+      regime_score >= 0.5 ~ "MOMENTUM_MODERATE", 
+      regime_score >= 0.3 ~ "MOMENTUM_WEAK",
+      TRUE ~ "MOMENTUM_HOSTILE"
+    )
+  )
+
+# Save regime data to database
+regime_db_data <- regime_indicators |>
+  select(ref_date, vix_level, spy_trend_score, market_breadth, regime_score, regime_label) |>
+  rename(regime_date = ref_date) |>
+  mutate(regime_date = as.character(regime_date))
+
+dbWriteTable(db_conn, "regime_data", as.data.frame(regime_db_data), append = TRUE)
+
 # Initial Investment
 etf_nav <- c(100)
 nav_dates <- c()
 selected_tickers <- list()
 
-# Monthly Rebalance of the ETF
+# Monthly Rebalance of the ETF with Regime Detection
 for (i in 1:(length(rebalance_dates) - 1)) {
   current_date <- rebalance_dates[i]
   next_date <- rebalance_dates[i + 1]
   
+  # Get current regime
+  current_regime <- regime_indicators |>
+    filter(ref_date == current_date) |>
+    pull(regime_score)
+  
+  if (length(current_regime) == 0) current_regime <- 0.5  # Default to moderate
+  
+  # Determine position count based on regime
+  position_count <- case_when(
+    current_regime >= 0.7 ~ 10,  # Strong momentum: full exposure
+    current_regime >= 0.5 ~ 8,   # Moderate momentum: standard exposure  
+    current_regime >= 0.3 ~ 5,   # Weak momentum: defensive
+    TRUE ~ 3                     # Hostile: very defensive
+  )
+  
   current_data <- price_data |> 
     filter(ref_date == current_date, is.finite(risk_adjusted_momentum)) |> 
     arrange(desc(risk_adjusted_momentum)) |> 
-    head(10)
+    head(position_count)
   
   top_tickers <- current_data$ticker
   
@@ -120,11 +232,15 @@ for (i in 1:(length(rebalance_dates) - 1)) {
     nav_dates <- append(nav_dates, next_date)
     selected_tickers <- append(selected_tickers, list(top_tickers))
     
-    # Save selected stocks to SQLite database
+    # Save selected stocks to SQLite database with regime info
     holdings_data <- current_data |>
       select(ticker, risk_adjusted_momentum, price_adjusted, monthly_return, 
              return_12m, return_1m, volatility_12m) |>
-      mutate(rebalance_date = as.character(current_date)) |>
+      mutate(
+        rebalance_date = as.character(current_date),
+        regime_score = current_regime,
+        position_count = position_count
+      ) |>
       rename(price = price_adjusted)
     
     # Convert to dataframe for database insertion
@@ -148,16 +264,6 @@ for (i in 1:(length(rebalance_dates) - 1)) {
 
 # Convert ETF NAV to a timeseries 
 etf_xts <- xts(etf_nav[-1], order.by = nav_dates)
-
-# Collect S&P 500 Data
-spy <- BatchGetSymbols(
-  tickers = "SPY",
-  freq.data = "monthly",
-  first.date = as.Date("2013-01-01"), thresh.bad.data = 0.5,
-  last.date = as.Date("2023-12-31"), 
-  cache.folder = file.path(tempdir(), "BGS_Cache"))
-
-spy_price_data <- spy$df.tickers |> clean_names()
 
 spy_price_data <- spy_price_data |> arrange(ref_date) |> 
   mutate(monthly_returns = price_adjusted / lag(price_adjusted) - 1) |> 
@@ -188,7 +294,7 @@ colnames(etf_xts) <- "ETF"
 colnames(spy_xts) <- "SPY"
 combined_nav <- cbind(etf_xts, spy_xts)
 
-dygraph(combined_nav, main = "Momentum ETF vs SPY")  |> 
+dygraph(combined_nav, main = "Regime-Aware Momentum ETF vs SPY")  |> 
   dySeries("ETF", label = "Momentum ETF", color = "blue") |> 
   dySeries("SPY", label = "SPY", color = "red") |> 
   dyOptions(stackedGraph = FALSE, drawGrid = TRUE) |> 
@@ -344,7 +450,43 @@ metrics_data
 # Insert metrics data
 dbWriteTable(db_conn, "performance_metrics", metrics_data, append = TRUE)
 
+# Display regime analysis
+cat("\n=== REGIME ANALYSIS ===\n")
+regime_summary <- regime_indicators |>
+  group_by(regime_label) |>
+  summarise(
+    months = n(),
+    avg_regime_score = round(mean(regime_score, na.rm = TRUE), 3),
+    avg_vix = round(mean(vix_level, na.rm = TRUE), 1),
+    .groups = 'drop'
+  ) |>
+  arrange(desc(avg_regime_score))
+
+print(regime_summary)
+
 # Close the database connection
 dbDisconnect(db_conn)
 
-cat("\nDatabase connection closed. You can now view the 'momentum_etf.sqlite' file with DB Browser for SQLite.\n")
+cat("\n=== RESULTS ===\n")
+cat("Database connection closed. You can now view the 'momentum_etf.sqlite' file with DB Browser for SQLite.\n")  
+cat("New tables added: regime_data\n")
+cat("Enhanced holdings table now includes regime_score and position_count\n")
+cat("Chart title updated to reflect regime-aware strategy\n")
+
+
+
+spy_total_return <- prod(1 + spy_filtered$monthly_returns, na.rm = TRUE)
+spy_final_value <- 100 * spy_total_return
+print(paste("SPY should end at:", round(spy_final_value, 2)))
+
+# Check your current SPY calculation
+print(paste("Your SPY final value:", round(last(spy_nav), 2)))
+
+# Check if there are any NA values affecting the calculation
+sum(is.na(spy_filtered$monthly_returns))
+
+# Let's also verify the mean monthly return
+mean_monthly <- mean(spy_filtered$monthly_returns, na.rm = TRUE)
+annualized_return <- (1 + mean_monthly)^12 - 1
+print(paste("SPY average monthly return:", round(mean_monthly * 100, 2), "%"))
+print(paste("SPY annualized return:", round(annualized_return * 100, 1), "%"))
