@@ -30,7 +30,7 @@ Monthly rebalancing momentum strategy with comprehensive risk analytics.
 ### 📋 [Python Performance Analysis](./python-buffer-performance/)
 Analysis and visualization of strategy performance.
 
-### 📋 [R Performance Analysis](./R-ETF/)
+### 📋 [R Performance Analysis](./r-etf/)
 Comparative analysis and visualization of strategy performance vs benchmarks.
 
 ## Strategy Methodology
