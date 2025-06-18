@@ -472,21 +472,3 @@ cat("Database connection closed. You can now view the 'momentum_etf.sqlite' file
 cat("New tables added: regime_data\n")
 cat("Enhanced holdings table now includes regime_score and position_count\n")
 cat("Chart title updated to reflect regime-aware strategy\n")
-
-
-
-spy_total_return <- prod(1 + spy_filtered$monthly_returns, na.rm = TRUE)
-spy_final_value <- 100 * spy_total_return
-print(paste("SPY should end at:", round(spy_final_value, 2)))
-
-# Check your current SPY calculation
-print(paste("Your SPY final value:", round(last(spy_nav), 2)))
-
-# Check if there are any NA values affecting the calculation
-sum(is.na(spy_filtered$monthly_returns))
-
-# Let's also verify the mean monthly return
-mean_monthly <- mean(spy_filtered$monthly_returns, na.rm = TRUE)
-annualized_return <- (1 + mean_monthly)^12 - 1
-print(paste("SPY average monthly return:", round(mean_monthly * 100, 2), "%"))
-print(paste("SPY annualized return:", round(annualized_return * 100, 1), "%"))
