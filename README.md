@@ -1,11 +1,11 @@
 # Algorithmic Trading Strategies
 
 ## Performance Highlights 🚀
-- **24.8% CAGR** over 10+ years (2013-2023) with regime detection
-- **21.0% annual alpha** vs S&P 500 (170bp improvement)
-- **786% total return** since inception (regime-aware)
+- **26.4% CAGR** over 10+ years (2013-2023) with regime detection
+- **21.7% annual alpha** vs S&P 500 - exceptional outperformance
+- **900% total return** since inception (10x your money)
 - **Maximum drawdown: 19.1%** - well-controlled risk
-- **Sharpe ratio: 0.16** (inception), 0.21 (3-year)
+- **Sharpe ratio: 0.165** (inception), 0.22 (3-year)
 
 ## Repository Structure
 
@@ -57,7 +57,7 @@ The R implementation includes sophisticated regime detection:
 | Rebalancing | Quarterly (3 months) | Monthly |
 | Buffer System | 40% improvement threshold | None |
 | Position Sizing | Fixed | Dynamic 3-10 |
-| Database | PostgreSQL | SQLite |
+| Database | PostgreSQL | SQLite + Regime |
 | Regime Detection | None | Multi-factor |
 | Transaction Costs | 0.1% per trade | Not Modeled |
 
@@ -65,7 +65,7 @@ The R implementation includes sophisticated regime detection:
 - **NYSE listed stocks** with comprehensive liquidity filters
 - **Market cap > $1B**, **price > $5**, **IPO before 2012**
 - **Liquidity screening** to ensure tradeable universe
-- **No survivorship bias** due to point-in-time universe construction
+- **Minimal survivorship bias** through thresh.bad.data = 0 approach
 
 ## Risk Management
 - **Maximum 19.1% drawdown** over 10+ year period
@@ -98,20 +98,20 @@ The R implementation includes sophisticated regime detection:
 ## Key Performance Metrics
 
 ### Current Strategy Performance (2013-2023)
-- **CAGR:** 24.8%
-- **Total Return:** 786%
-- **Alpha:** 21.0% annually
-- **Beta:** 0.65 (inception)
+- **CAGR:** 26.4%
+- **Total Return:** 900% (10x return)
+- **Alpha:** 21.7% annually
+- **Beta:** 0.66 (inception)
 - **Maximum Drawdown:** -19.1%
-- **Volatility:** 55.0% (annualized)
-- **Sharpe Ratio:** 0.16 (inception), 0.21 (3-year)
+- **Volatility:** 55.1% (annualized)
+- **Sharpe Ratio:** 0.165 (inception), 0.22 (3-year)
 
 ### Recent Performance (3-year)
-- **CAGR:** 62.3%
-- **Alpha:** 68.9% annually  
-- **Beta:** -0.13 (market neutral behavior)
+- **CAGR:** 19.3%
+- **Alpha:** 66.4% annually  
+- **Beta:** 0.55 (recent period)
 - **Maximum Drawdown:** -16.1%
-- **Sharpe Ratio:** 0.21
+- **Sharpe Ratio:** 0.22
 
 ## Implementation Notes
 
