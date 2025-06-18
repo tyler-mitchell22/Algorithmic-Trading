@@ -3,7 +3,7 @@
 ## Performance Highlights 🚀
 - **26.4% CAGR** over 10+ years (2013-2023) with regime detection
 - **21.7% annual alpha** vs S&P 500 - exceptional outperformance
-- **900% total return** since inception (10x your money)
+- **900% total return** since inception
 - **Maximum drawdown: 19.1%** - well-controlled risk
 - **Sharpe ratio: 0.165** (inception), 0.22 (3-year)
 
