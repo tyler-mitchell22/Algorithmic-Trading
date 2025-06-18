@@ -57,7 +57,7 @@ The R implementation includes sophisticated regime detection:
 | Rebalancing | Quarterly (3 months) | Monthly |
 | Buffer System | 40% improvement threshold | None |
 | Position Sizing | Fixed | Dynamic 3-10 |
-| Database | PostgreSQL | SQLite + Regime |
+| Database | PostgreSQL | SQLite |
 | Regime Detection | None | Multi-factor |
 | Transaction Costs | 0.1% per trade | Not Modeled |
 
